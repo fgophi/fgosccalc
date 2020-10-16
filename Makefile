@@ -33,7 +33,7 @@ sync:
 	git merge origin/master --ff
 	git submodule update --remote
 
-docker-build:
+docker-build: build
 	docker build -t fgosc/fgosccalc:latest .
 
 docker-run:
