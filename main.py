@@ -14,6 +14,7 @@ from bottle import Bottle, redirect, request, template
 
 import dropitemseditor
 import img2str
+from lib.twitter import upload_webfile
 from storage.filesystem import FileSystemStorage
 try:
     from storage.datastore import GoogleDatastoreStorage
@@ -84,6 +85,7 @@ class ScreenShotBundle:
         self.before_images = []
         self.after_images = []
         self.owned_images = []
+        self.owned_images_jpeg = []
         self.before_sc_objects = []
         self.after_sc_objects = []
         self.before_sc_itemlist = []
@@ -121,6 +123,8 @@ class ScreenShotBundle:
             na = cv2.imdecode(get_np_array(of), 1)
             im = nparray_to_imagebytes(na)
             self.owned_images.append(im)
+            jpeg = nparray_to_jpeg(na)
+            self.owned_images_jpeg.append(jpeg)
 
         self.parse_result = dropitemseditor.make_diff(
             copy.deepcopy(self.before_sc_itemlist),
@@ -177,6 +181,12 @@ class ScreenShotBundle:
     def encoded_image_pairs(self):
         return [
             (nparray_to_imagebytes(before), nparray_to_imagebytes(after))
+            for before, after in itertools.zip_longest(self.before_images, self.after_images)
+        ]
+
+    def jpeg_image_pairs(self):
+        return [
+            (nparray_to_jpeg(before), nparray_to_jpeg(after))
             for before, after in itertools.zip_longest(self.before_images, self.after_images)
         ]
 
@@ -243,6 +253,13 @@ def upload_post():
     logger.info('pairs: %s', before_after_pairs)
     contains_unknown_items = any([pair[0].startswith('item0') for pair in before_after_pairs])
 
+    try:
+        image_url = upload_webfile(bundle.jpeg_image_pairs(), bundle.owned_images_jpeg)
+    except:
+        logger.warning("uploda img to twitter failed")
+        image_url = ''
+    logger.info('url: %s', image_url)
+
     return template('result',
         result=makeup(bundle.parse_result),
         sc1_available=(len(bundle.before_sc_itemlist) > 0),
@@ -253,6 +270,7 @@ def upload_post():
         questname=questname,
         dropdata=json.dumps(dropdata),
         contains_unknown_items=contains_unknown_items,
+        image_url=image_url,
     )
 
 
